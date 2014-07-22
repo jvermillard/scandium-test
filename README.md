@@ -1,4 +1,4 @@
 scandium-test
 =============
 
-Eclipse Californium Scandium (Java DTLS imeplementation) automatic testing 
+Eclipse Californium Scandium (Java DTLS implementation) automatic testing 
