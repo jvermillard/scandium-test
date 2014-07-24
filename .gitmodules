@@ -1,0 +1,3 @@
+[submodule "scandium"]
+	path = scandium
+	url = https://github.com/eclipse/californium.scandium.git
