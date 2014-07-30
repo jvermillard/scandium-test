@@ -1,3 +1,3 @@
 #!/bin/sh
-cd scandium-server
-docker build -t jvermillard/scandium-test .
+cd test-container
+sudo docker build -t jvermillard/test-container .
