@@ -17,7 +17,6 @@ import org.junit.Test;
 
 public class PskServerTest {
 
-    private CountDownLatch latch = new CountDownLatch(6);
     private List<RawData> rcvd = new ArrayList<>();
 
     /**
@@ -26,28 +25,65 @@ public class PskServerTest {
      */
     @Test
     public void basic_tls_psk_test() throws IOException, InterruptedException {
-        InMemoryPskStore pskStore = new InMemoryPskStore();
-        // put in the PSK store the default identity/psk for tinydtls tests
-        pskStore.setKey("Client_identity", "secretPSK".getBytes());
-
         DTLSConnector dtlsServer = new DTLSConnector(new InetSocketAddress(5684), null);
-        dtlsServer.getConfig().setServerPsk(pskStore);
+        try {
+            CountDownLatch latch = new CountDownLatch(6);
 
-        dtlsServer.setRawDataReceiver(new RawDataChannelImpl(dtlsServer));
+            InMemoryPskStore pskStore = new InMemoryPskStore();
+            // put in the PSK store the default identity/psk for tinydtls tests
+            pskStore.setKey("Client_identity", "secretPSK".getBytes());
 
-        dtlsServer.start();
-        ScriptRunner.runLuaScript("src/test/resources/simple-psk-client.lua");
-        // wait for some data
-        Assert.assertTrue(latch.await(10, TimeUnit.SECONDS));
-        dtlsServer.stop();
+            dtlsServer.getConfig().setServerPsk(pskStore);
+
+            dtlsServer.setRawDataReceiver(new RawDataChannelImpl(dtlsServer, latch));
+
+            dtlsServer.start();
+            ScriptRunner.runLuaScript("lua5.1", "src/test/resources/simple-psk-client.lua", "5684");
+            // wait for some data
+            Assert.assertTrue(latch.await(10, TimeUnit.SECONDS));
+            dtlsServer.stop();
+        } finally {
+            dtlsServer.stop();
+        }
+    }
+
+    @Test
+    public void tls_psk_error_and_restart_session() throws IOException, InterruptedException {
+        DTLSConnector dtlsServer = new DTLSConnector(new InetSocketAddress(5685), null);
+        try {
+            CountDownLatch latch = new CountDownLatch(6);
+            InMemoryPskStore pskStore = new InMemoryPskStore();
+            // put in the PSK store the default identity/psk for tinydtls tests
+            pskStore.setKey("Client_identity", "secretPSK".getBytes());
+
+            dtlsServer.getConfig().setServerPsk(pskStore);
+
+            dtlsServer.setRawDataReceiver(new RawDataChannelImpl(dtlsServer, latch));
+
+            dtlsServer.start();
+
+            ScriptRunner.runLuaScript("lua5.1", "src/test/resources/wrong-psk-client.lua", "5685");
+
+            // wait for failure
+            Thread.sleep(2000);
+
+            // restart session with the correct PSK
+            ScriptRunner.runLuaScript("lua5.1", "src/test/resources/simple-psk-client.lua", "5685");
+            Assert.assertTrue(latch.await(10, TimeUnit.SECONDS));
+        } finally {
+            dtlsServer.stop();
+        }
     }
 
     private class RawDataChannelImpl implements RawDataChannel {
 
         private Connector connector;
 
-        public RawDataChannelImpl(Connector con) {
+        private final CountDownLatch latch;
+
+        public RawDataChannelImpl(Connector con, CountDownLatch latch) {
             this.connector = con;
+            this.latch = latch;
         }
 
         public void receiveData(final RawData raw) {

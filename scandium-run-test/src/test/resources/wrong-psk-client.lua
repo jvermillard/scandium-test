@@ -9,9 +9,10 @@ local udp = socket.udp();
 
 local port = tonumber(arg[1])
 udp:setsockname('*', port+1000)
+-- print(port)
 
 -- change UDP socket in DTLS socket
-dtls.wrap(udp, {security = "PSK", identity = "Client_identity", key = "secretPSK"})
+dtls.wrap(udp, {security = "PSK", identity = "Client_identity", key = "WRONGsecretPSK"})
 
 -- DTLS handshake in automaticaly do at first sendto
 udp:sendto("my clear data 1\n","127.0.0.1", port)
